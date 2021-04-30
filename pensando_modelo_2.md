@@ -54,13 +54,13 @@ Preguntas que pensé, teniendo en cuenta relación de entre los datos. Hay que d
 
 * **¿Presentar Barrio y Proporcion de personas que declararon un alto u bajo ingreso?**
     * ¿Estaria piola empezar poniendo un mapa de CABA? ¿Mostrar participación por comunas?
-    * ¿Tiene alto u bajo ingreso segun el barrio en el que se encuentra?
+    * ¿Tiene alto u bajo ingreso segun el barrio en el que se encuentra? #Bar plot, ejemplo en teorica, podria verse tambien la proporcion por cada barrio en particular
     
-* **¿Presentar la gente que haya declarado en la Bolsa Argentina?**
+* **¿Presentar la gente que haya declarado en la Bolsa Argentina?**         
     * ¿Ver si hay una relacion con el barrio y la declaracion de la bolsa? 
     * ¿Ver si hay relacion con declaracion en la bolsa y con la decleración de si tiene alto u bajo ingreso?
     * ¿Y la relacion de bolsa declarada, barrio y sobre si tiene bajo u alto ingreso? ¿Heatmap o algun grafico para relacioanr esas 3 variables?
-
+    *
 * **¿Presentar Edades y Generos encuestadas?**
     * ¿Relacion entre edad con la declaracion del genero? 
      * ¿Hay grupo de edad predominante que responde la encuesta y otros no se registró datos?
@@ -73,6 +73,7 @@ Preguntas que pensé, teniendo en cuenta relación de entre los datos. Hay que d
     * ¿Relacion entre las 3 simultaneamente: alto ingreso, genero y edad? 
     * ¿Y la bolsa declarada? ¿Comentamos algo al respecto o ya seria mucho?
     
+    
 
 * **¿Presentar Trabajo, Categoria de Trabajo y Horas trabajadas?** O sea, 3 variables recontra relacionadas.
     * ¿Influye el tipo de trabajo en la declaracion de alto u bajo ingreso?
@@ -84,7 +85,7 @@ Preguntas que pensé, teniendo en cuenta relación de entre los datos. Hay que d
         * ¿En cierta edad, con cierto trabajo o cierta cantidad de horas o cierta categoria, afecta a la declaracion de tener algo ingreso u bajo?
         * Se me ocurre por ejemplo... ¿Cuanto mas joven sos, menor horas trabajas, se declaro alto u bajo ingreso? 
             * O sea.. hay una categoria de edad especial el cual se labura mucho o poco y se declara que tiene alto u bajo ingreso?
-            
+    * ¿Cuales son los trabajos que presentan alta cantidad de declaracion de altos ingresos? ¿Y de baja cantidad?        
 
 * **¿Educación alcanzada y años estudiados?** 
     * ¿Hay relacio entre educacion alcanzada y años estudiados?
@@ -92,10 +93,13 @@ Preguntas que pensé, teniendo en cuenta relación de entre los datos. Hay que d
     * ¿Influye la cantidad años estudiados con la declaracion de alto u bajo ingreso?
     * ¿Y la edad acá? ¿Mayor años estudiados, mayor educacion, mayor ingresos.. dependerá la edad? ¿Quizas para menor edad, o mayor edad?
  
-* **¿Presentar Estado marital y rol familiar registrado?**
+* **¿Presentar Estado marital y rol familiar registrado?**                
     * ¿Influye estado marital con la declaracion de alto u bajo ingreso?
         * ¿Y el rol familiar dentro de ese estado marital?
-
+    
 * **¿Religion?**
-    * ¿Influye religion con la declaracion de alto u bajo ingreso?
+    * ¿Influye religion con la declaracion de alto u bajo ingreso? 
+    
+* * ¿Categoria de trabajo?
+    * ¿Que categorias 
 
