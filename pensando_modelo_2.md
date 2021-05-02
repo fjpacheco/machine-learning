@@ -101,5 +101,6 @@ Preguntas que pensé, teniendo en cuenta relación de entre los datos. Hay que d
     * ¿Influye religion con la declaracion de alto u bajo ingreso? 
     
 * * ¿Categoria de trabajo?
-    * ¿Que categorias 
+    * ¿Influye la categoria del trabajo (municipal,relacion de depencia,etc) en la declaracion de altos ingresos?
+    
 
