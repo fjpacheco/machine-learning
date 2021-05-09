@@ -8,9 +8,12 @@
 -educacion
     trabajo
 -bolsa
+    estado_marital
 -valor_adquisitivo
     trabajo
--religion
+    religion
+    estado_marital 
+
 
 
 
