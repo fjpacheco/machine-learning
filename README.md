@@ -1,10 +1,11 @@
-# Trabajo Práctico N°1: FIUFIP!
+# Trabajo Práctico: FIUFIP!
 
 ## Organización de Datos (75.06/95.58)
 ### Facultad de Ingeniería - Universidad de Buenos Aires
 #### Curso Collinet
 
-Primer trabajo práctico sobre Análisis Exploratorio.
+* Primer trabajo práctico sobre Análisis Exploratorio.
+* Segundo trabajo práctico sobre Aprendizaje Automático.
 
 #### Integrantes 
 
