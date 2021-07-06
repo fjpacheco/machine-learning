@@ -56,7 +56,11 @@ def aplicar_preparacion(df_train: pd.DataFrame):
     #X_train['anios_estudiados'] =  X_train['anios_estudiados'].apply(agrupacion_anios_estudiados)
     
     # Eliminación de variables irrelevantes
-    X_train.drop(columns=['barrio'], inplace=True)
+    # TODO: Llevar a Barrios => Palermo y No-Palermo
+    X_train.drop(columns=['barrio'], inplace=True) 
+    
+
+    # NO HACE FALTA:
     
     # Conversión tipos datos para optimización de memoria
         # "category": to more efficiently store the data -> https://pbpython.com/pandas_dtypes_cat.html#:~:text=The%20category%20data%20type%20in,more%20efficiently%20store%20the%20data.
@@ -98,7 +102,7 @@ def conversion_numerica(X_train: pd.DataFrame):
         'trabajo', 
         'categoria_de_trabajo',
         'religion', 
-        'rol_familiar_registrado'
+        'rol_familiar_registrado',
         ])
 
     # La que tiene noción de orden la hago de 0,1,..,6        
@@ -191,7 +195,7 @@ def declaracion_actividad_en_bolsa(df: pd.DataFrame):
     
 def agrupar_edad_por_rangos(df: pd.DataFrame):
     rango_edades =  np.arange(10,100,10)
-    df['edad_en_rango'] = pd.Series(pd.cut(df['edad'], bins = rango_edades))
+    pd.Series(pd.cut(df['edad'], bins = rango_edades))
  
 
 ################## FUNCIONES AUXILIARES USADAS
@@ -225,7 +229,6 @@ def graficar_matriz_confusion(y_true, y_pred):
     plt.show()
 
 
-    
 def plot_roc_curves(clf, XX_test, yy_test, XX_train, yy_train):
     plt.figure(dpi=110)
 
