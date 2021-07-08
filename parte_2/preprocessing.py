@@ -124,6 +124,96 @@ def conversion_numerica(X_train: pd.DataFrame):
 
 
 
+def conversion_numerica_tp2(X_train: pd.DataFrame):
+    """Recibe el dataset X_train preparado y retorna el dataset modificado con sus features de tipo "category" a numéricas con OneHotEncoding y OrdinalEncoder.
+
+    A las features con noción de orden se les asigna numero según el orden dado (por ejemplo, la feature de educacion_alcanzada)
+
+    """
+    # OneHoteo algunas:
+    X_train = pd.get_dummies(X_train, drop_first=True, columns=[
+        'genero', 
+        'estado_marital', 
+        'trabajo', 
+        'barrio', 
+        'categoria_de_trabajo',
+        'religion', 
+        'rol_familiar_registrado',
+        ])
+
+    # La que tiene noción de orden la hago de 0,1,..,6        
+    X = [['ciclo_inicial', 
+        'segundo_ciclo', 
+        'universitario_inicial',
+        'universitario_avanzado']]
+    enc = OrdinalEncoder(categories = X)
+    X_train['educacion_alcanzada'] = enc.fit_transform(X_train.loc[:,['educacion_alcanzada']])
+    X_train = X_train.astype({"educacion_alcanzada": np.ubyte})
+
+    # ¡Para ver la inversa!
+    #enc.inverse_transform(X_train[['educacion_alcanzada']])
+
+    return X_train    
+
+
+def aplicar_preparacion_tp2(df_train: pd.DataFrame):
+    """Se prepara el dataset acorde al Análisis Exploratorio realizado en el TP1 y el nuevo en el TP2.
+
+    Retorno
+    --------
+         X_train -> pd.DataFrame: El dataset preparado, solamente con los features sin la target.
+        y_target -> numpy.ndarray: La feature target eliminada del dataset de las features.
+    """
+    
+    # Renombración:
+    X_train = df_train
+    X_train.rename(columns={'ganancia_perdida_declarada_bolsa_argentina':'suma_declarada_bolsa_argentina'},inplace=True)
+    X_train['rol_familiar_registrado'].mask((X_train.rol_familiar_registrado == 'casado' ) | (X_train.rol_familiar_registrado == 'casada'), 'casado_a', inplace=True)
+    X_train['estado_marital'].mask(X_train.estado_marital == 'divorciado' , 'divorciado_a', inplace=True)
+    X_train['estado_marital'].mask(X_train.estado_marital == 'separado', 'separado_a', inplace=True)
+    
+    # Missings:
+    X_train['categoria_de_trabajo'].replace(np.nan,'No contesta', inplace=True)
+    X_train['trabajo'].replace(np.nan,'No contesta', inplace=True)
+   
+    
+    # Aplicando las transformacioens del TP1:
+    X_train['categoria_de_trabajo'] = X_train['categoria_de_trabajo'].apply(generalizar_empleados_publicos)
+    X_train['educacion_alcanzada'] = X_train['educacion_alcanzada'].apply(agrupar_educacion_alcanzada_tp2)
+    X_train['barrio'] =  X_train['barrio'].apply(agrupar_palermo_o_no_tp2)
+    X_train['religion'] =  X_train['religion'].apply(agrupar_cristiano_o_no_tp2)   
+
+    # NO HACE FALTA:
+    
+    # Conversión tipos datos para optimización de memoria
+        # "category": to more efficiently store the data -> https://pbpython.com/pandas_dtypes_cat.html#:~:text=The%20category%20data%20type%20in,more%20efficiently%20store%20the%20data.
+    X_train = X_train.astype({
+            "trabajo": "category", 
+            "categoria_de_trabajo": "category",
+            "genero": "category",
+            "barrio": "category",
+            "religion": "category",
+            "educacion_alcanzada": "category",
+            "estado_marital": "category",
+            "rol_familiar_registrado": "category",        
+            }) 
+
+        # ubyte: [0, 255) -> https://numpy.org/devdocs/reference/arrays.scalars.html#numpy.ubyte 
+    X_train = X_train.astype({
+            "tiene_alto_valor_adquisitivo": np.ubyte, 
+            "edad": np.ubyte,
+            "anios_estudiados": np.ubyte,
+            "horas_trabajo_registradas": np.ubyte,
+            }) 
+
+
+    # Obtención de feature de validación: 
+    y_target = np.array(X_train[['tiene_alto_valor_adquisitivo']]).ravel()
+    X_train.drop(columns=['tiene_alto_valor_adquisitivo'], inplace=True)
+
+    return X_train, y_target
+
+
 ####### Se generaron nuevas features en ciertos analisis del TP1. En este preprocessing.py están dichas funciones que generan esas nuevas features.
 
 
@@ -162,6 +252,48 @@ def agrupar_educacion_alcanzada(categoria):
         return 'Primaria - (6,9] grado'
     if categoria in ['preescolar']:
         return 'Jardin'    
+    return categoria
+
+
+def agrupar_educacion_alcanzada_tp2(categoria):
+    """
+        Nueva generación
+        
+    """
+        
+    if categoria in ['universidad_4_anio','universiada_5_anio','universiada_6_anio']:
+        return 'universitario_avanzado'
+    if categoria in ['universidad_1_anio','universidad_2_anio','universidad_3_anio']:
+        return 'universitario_inicial'
+    if categoria in ['1_anio','2_anio','3_anio']:
+        return 'segundo_ciclo'
+    if categoria in ['4_anio','5_anio','6_anio']:
+        return 'segundo_ciclo'
+    if categoria in ['1-4_grado','5-6_grado']:
+        return 'ciclo_inicial'
+    if categoria in ['7-8_grado','9_grado']:
+        return 'ciclo_inicial'
+    if categoria in ['preescolar']:
+        return 'ciclo_inicial'    
+    return categoria
+
+
+def agrupar_cristiano_o_no_tp2(categoria):
+    """
+        Nueva generación
+        
+    """
+    if categoria not in ['cristianismo']:
+        return 'no_cristianismo'
+    return categoria
+
+def agrupar_palermo_o_no_tp2(categoria):
+    """
+        Nueva generación
+        
+    """
+    if categoria not in ['Palermo']:
+        return 'no_palermo'
     return categoria
 
 
