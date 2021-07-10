@@ -1,19 +1,23 @@
-import requests 
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import requests
 import seaborn as sns
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import auc, confusion_matrix, roc_curve
 from sklearn.preprocessing import OrdinalEncoder
-from sklearn.metrics import roc_curve, auc
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.feature_selection import VarianceThreshold
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.decomposition import TruncatedSVD
+from sklearn.feature_selection import RFECV
 
 def obtener_datasets():
-    """Se obtiene los datasets descargados desde Google Drive.
+    """Se obtiene los datasets descargados desde Google Drive de la materia.
 
     Retorno
     --------
-           df_train -> pd.DataFrame: El dataset del TP1, descargado desde Google Drive.
-        df_holdhout -> pd.DataFrame: El dataset presentando en el TP2 que se usará como holdout, descargado desde Google Drive.
+           df_train -> pd.DataFrame: El dataset del TP1 que se usará para entrenar.
+        df_holdhout -> pd.DataFrame: El dataset presentando en el TP2 que se usará como holdout.
     """
     with requests.get("https://docs.google.com/spreadsheets/d/1-DWTP8uwVS-dZY402-dm0F9ICw_6PNqDGLmH0u8Eqa0/export?format=csv") as r, open("fiufip_dataset_old.csv", "wb") as f:
         for chunk in r.iter_content():
@@ -28,72 +32,77 @@ def obtener_datasets():
     
     return df_train, df_holdout
 
+def aplicar_preparacion(df: pd.DataFrame):
+    """Se prepara el dataset para entrenar acorde al Análisis Exploratorio realizado en el TP1.
 
-def aplicar_preparacion(df_train: pd.DataFrame):
-    """Se prepara el dataset acorde al Análisis Exploratorio realizado en el TP1.
+    Parametros recibidos
+    --------
+        df -> pd.DataFrame: El dataset obtenido mediante 'obtener_datasets()'
 
     Retorno
     --------
-         X_train -> pd.DataFrame: El dataset preparado, solamente con los features sin la target.
+        X_train -> pd.DataFrame: El dataset preparado, solamente con los features sin la target.
         y_target -> numpy.ndarray: La feature target eliminada del dataset de las features.
     """
     
-    # Renombración:
-    X_train = df_train
-    X_train.rename(columns={'ganancia_perdida_declarada_bolsa_argentina':'suma_declarada_bolsa_argentina'},inplace=True)
-    X_train['rol_familiar_registrado'].mask((X_train.rol_familiar_registrado == 'casado' ) | (X_train.rol_familiar_registrado == 'casada'), 'casado_a', inplace=True)
-    X_train['estado_marital'].mask(X_train.estado_marital == 'divorciado' , 'divorciado_a', inplace=True)
-    X_train['estado_marital'].mask(X_train.estado_marital == 'separado', 'separado_a', inplace=True)
-    
-    # Missings:
-    X_train['categoria_de_trabajo'].replace(np.nan,'No contesta', inplace=True)
-    X_train['trabajo'].replace(np.nan,'No contesta', inplace=True)
+    renombrar_variables(df)
+    solucionar_missings(df)
    
-    
     # Aplicando las transformacioens del TP1:
-    X_train['categoria_de_trabajo'] = X_train['categoria_de_trabajo'].apply(generalizar_empleados_publicos)
-    X_train['educacion_alcanzada'] = X_train['educacion_alcanzada'].apply(agrupar_educacion_alcanzada)
-    #X_train['anios_estudiados'] =  X_train['anios_estudiados'].apply(agrupacion_anios_estudiados)
+    df['categoria_de_trabajo'] = df['categoria_de_trabajo'].apply(generalizar_empleados_publicos)
+    df['educacion_alcanzada'] = df['educacion_alcanzada'].apply(agrupar_educacion_alcanzada)
     
     # Eliminación de variables irrelevantes
-    # TODO: Llevar a Barrios => Palermo y No-Palermo
-    X_train.drop(columns=['barrio'], inplace=True) 
+    df.drop(columns=['barrio'], inplace=True) 
     
-
-    # NO HACE FALTA:
-    
-    # Conversión tipos datos para optimización de memoria
-        # "category": to more efficiently store the data -> https://pbpython.com/pandas_dtypes_cat.html#:~:text=The%20category%20data%20type%20in,more%20efficiently%20store%20the%20data.
-    X_train = X_train.astype({
-            "trabajo": "category", 
-            "categoria_de_trabajo": "category",
-            "genero": "category",
-            "religion": "category",
-            "educacion_alcanzada": "category",
-            "estado_marital": "category",
-            "rol_familiar_registrado": "category",        
-            }) 
-
-        # ubyte: [0, 255) -> https://numpy.org/devdocs/reference/arrays.scalars.html#numpy.ubyte 
-    X_train = X_train.astype({
-            "tiene_alto_valor_adquisitivo": np.ubyte, 
-            "edad": np.ubyte,
-            "anios_estudiados": np.ubyte,
-            "horas_trabajo_registradas": np.ubyte,
-            }) 
-
+    conversion_tipos(df)
 
     # Obtención de feature de validación: 
-    y_target = np.array(X_train[['tiene_alto_valor_adquisitivo']]).ravel()
-    X_train.drop(columns=['tiene_alto_valor_adquisitivo'], inplace=True)
+    y_target = obtener_feature_validacion(df)
 
-    return X_train, y_target
+    return df, y_target
+
+
+def aplicar_preparacion_generalizado(df: pd.DataFrame):
+    """Se prepara el dataset para entrenar acorde a un nuevo Análisis Exploratorio.
+
+    Parametros recibidos
+    --------
+        df -> pd.DataFrame: El dataset obtenido mediante 'obtener_datasets()'
+
+    Retorno
+    --------
+        X_train -> pd.DataFrame: El dataset preparado, solamente con los features sin la target.
+        y_target -> numpy.ndarray: La feature target eliminada del dataset de las features.
+    """
+    
+    renombrar_variables(df)
+    solucionar_missings(df)
+   
+    # Aplicando nueva transformación.
+    df['barrio'] =  df['barrio'].apply(agrupar_palermo_o_no_tp2)
+    
+    conversion_tipos(df)
+    df = df.astype({"barrio": "category"}) 
+
+    # Obtención de feature de validación: 
+    y_target = obtener_feature_validacion(df)
+
+    return df, y_target
+
 
 def conversion_numerica(X_train: pd.DataFrame):
-    """Recibe el dataset X_train preparado y retorna el dataset modificado con sus features de tipo "category" a numéricas con OneHotEncoding y OrdinalEncoder.
+    """ 
+    A las features con noción de orden se les asigna numero según el orden dado (por ejemplo, la feature de educacion_alcanzada) con OrdinalEncoder.
+    Y a las features sin orden se le aplica OneHotEncoding.
+    
+    Parametros recibidos
+    --------
+        X_train -> pd.DataFrame: el dataset preparado con 'aplicar_preparacion()'
 
-    A las features con noción de orden se les asigna numero según el orden dado (por ejemplo, la feature de educacion_alcanzada)
-
+    Retorno
+    --------
+        X_train -> pd.DataFrame: El dataset modificando las features de tipo "category" a numéricas con OneHotEncoding y OrdinalEncoder.
     """
     # OneHoteo algunas:
     X_train = pd.get_dummies(X_train, drop_first=True, columns=[
@@ -117,18 +126,23 @@ def conversion_numerica(X_train: pd.DataFrame):
     X_train['educacion_alcanzada'] = enc.fit_transform(X_train.loc[:,['educacion_alcanzada']])
     X_train = X_train.astype({"educacion_alcanzada": np.ubyte})
 
-    # ¡Para ver la inversa!
-    #enc.inverse_transform(X_train[['educacion_alcanzada']])
 
+    print("Aplicando 'conversion_numerica' en las variables categóricas.")
     return X_train
 
 
+def conversion_numerica_generalizada(X_train: pd.DataFrame):
+    """ 
+    A las features con noción de orden se les asigna numero según el orden dado (por ejemplo, la feature de educacion_alcanzada) con OrdinalEncoder.
+    Y a las features sin orden se le aplica OneHotEncoding.
+    
+    Parametros recibidos
+    --------
+        X_train -> pd.DataFrame: el dataset preparado con 'aplicar_preparacion_generalizado()'
 
-def conversion_numerica_tp2(X_train: pd.DataFrame):
-    """Recibe el dataset X_train preparado y retorna el dataset modificado con sus features de tipo "category" a numéricas con OneHotEncoding y OrdinalEncoder.
-
-    A las features con noción de orden se les asigna numero según el orden dado (por ejemplo, la feature de educacion_alcanzada)
-
+    Retorno
+    --------
+        X_train -> pd.DataFrame: El dataset modificando las features de tipo "category" a numéricas con OneHotEncoding y OrdinalEncoder.
     """
     # OneHoteo algunas:
     X_train = pd.get_dummies(X_train, drop_first=True, columns=[
@@ -142,56 +156,168 @@ def conversion_numerica_tp2(X_train: pd.DataFrame):
         ])
 
     # La que tiene noción de orden la hago de 0,1,..,6        
-    X = [['ciclo_inicial', 
-        'segundo_ciclo', 
-        'universitario_inicial',
-        'universitario_avanzado']]
+    X = [['preescolar', 
+        '1-4_grado','5-6_grado','7-8_grado','9_grado', 
+        '1_anio','2_anio','3_anio','4_anio','5_anio','6_anio',
+        'universidad_1_anio','universidad_2_anio','universidad_3_anio','universidad_4_anio','universiada_5_anio','universiada_6_anio']]
     enc = OrdinalEncoder(categories = X)
     X_train['educacion_alcanzada'] = enc.fit_transform(X_train.loc[:,['educacion_alcanzada']])
     X_train = X_train.astype({"educacion_alcanzada": np.ubyte})
 
-    # ¡Para ver la inversa!
-    #enc.inverse_transform(X_train[['educacion_alcanzada']])
-
+    print("Aplicando 'conversion_numerica_generalizada' en las variables categóricas.")
     return X_train    
 
 
-def aplicar_preparacion_tp2(df_train: pd.DataFrame):
-    """Se prepara el dataset acorde al Análisis Exploratorio realizado en el TP1 y el nuevo en el TP2.
+def get_dataframe_polynomial(df: pd.DataFrame, grade: np.uint8, interaction_only: bool):
+    """ 
+    Expande el dataset con PolynomialFeatures teniendo en cuentas las 4 columnas numéricas del mismo.
+    
+    Parametros recibidos
+    --------
+        df -> pd.DataFrame: El dataset obtenido mediante 'obtener_datasets()'.
+        grade -> np.uint8: el numero de grado para aplicar con PolynomialFeatures
+        interaction_only -> bool: indicador para para las potencias entre las nuevas features mediante
 
     Retorno
     --------
-         X_train -> pd.DataFrame: El dataset preparado, solamente con los features sin la target.
-        y_target -> numpy.ndarray: La feature target eliminada del dataset de las features.
+        df_poly -> pd.DataFrame: retorna el dataset recibido agregandole las nuevas features generadas a partir de PolynomialFeature segun los parametros recibidos.
     """
     
-    # Renombración:
-    X_train = df_train
-    X_train.rename(columns={'ganancia_perdida_declarada_bolsa_argentina':'suma_declarada_bolsa_argentina'},inplace=True)
-    X_train['rol_familiar_registrado'].mask((X_train.rol_familiar_registrado == 'casado' ) | (X_train.rol_familiar_registrado == 'casada'), 'casado_a', inplace=True)
-    X_train['estado_marital'].mask(X_train.estado_marital == 'divorciado' , 'divorciado_a', inplace=True)
-    X_train['estado_marital'].mask(X_train.estado_marital == 'separado', 'separado_a', inplace=True)
-    
-    # Missings:
-    X_train['categoria_de_trabajo'].replace(np.nan,'No contesta', inplace=True)
-    X_train['trabajo'].replace(np.nan,'No contesta', inplace=True)
-   
-    
-    # Aplicando las transformacioens del TP1:
-    X_train['categoria_de_trabajo'] = X_train['categoria_de_trabajo'].apply(generalizar_empleados_publicos)
-    X_train['educacion_alcanzada'] = X_train['educacion_alcanzada'].apply(agrupar_educacion_alcanzada_tp2)
-    X_train['barrio'] =  X_train['barrio'].apply(agrupar_palermo_o_no_tp2)
-    X_train['religion'] =  X_train['religion'].apply(agrupar_cristiano_o_no_tp2)   
+    print('Dataset inicial con', len(df.columns), 'features...')
 
-    # NO HACE FALTA:
+    to_expand = df[['anios_estudiados', 'edad', 'suma_declarada_bolsa_argentina', 'horas_trabajo_registradas']]
+    df_old = df.drop(columns =['anios_estudiados', 'edad', 'suma_declarada_bolsa_argentina', 'horas_trabajo_registradas'] )
+    poly = PolynomialFeatures(grade, interaction_only = interaction_only)
+    df_expand = pd.DataFrame(poly.fit_transform(to_expand))
+    df_expand = filter_by_variance(df_expand, 0)
+    df_poly = pd.concat([df_expand,df_old], axis=1)
+    print('Dataset nuevo con PolynomialFeature con', len(df_poly.columns), 'features...')
+    return df_poly
+
+
+
+def get_dataframe_polynomial_all(df: pd.DataFrame, grade: np.uint8, interaction_only: bool):
+    """ 
+    Expande el dataset con PolynomialFeatures teniendo en cuenta todas las columnas del dataset recibido.
     
+    Parametros recibidos
+    --------
+        df -> pd.DataFrame: El dataset obtenido mediante 'obtener_datasets()'.
+        grade -> np.uint8: el numero de grado para aplicar con PolynomialFeatures
+        interaction_only -> bool: indicador para para las potencias entre las nuevas features mediante
+
+    Retorno
+    --------
+        df_poly -> pd.DataFrame: retorna el dataset recibido agregandole las nuevas features generadas a partir de PolynomialFeature segun los parametros recibidos.
+    """
+    
+    print('Dataset inicial con', len(df.columns), 'features...')
+    poly = PolynomialFeatures(grade, interaction_only = interaction_only)
+    df_expand = pd.DataFrame(poly.fit_transform(df))
+    df_expand = filter_by_variance(df_expand, 0)
+    print('Dataset nuevo con PolynomialFeature con', len(df_expand.columns), 'features...')
+    return df_expand    
+
+def reduccion_numerica(df: pd.DataFrame, varianza_explicada: np.uint8 = 0.95):
+    """ 
+    Reduce la dimensionalidad del dataset recibido mediante TruncatedSVD manteniendo un 95% de varianza por default.
+    Antes de aplicar TruncatedSVD, se re-escala los datos mediante MinMaxScaler().
+            
+    Parametros recibidos
+    --------
+        df -> pd.DataFrame: recibe el dataset con el preprocesamiento aplicado por la función de 'aplicar_preparacion()' y, 'conversion_numerica' ó 'conversion_numerica_generalizada'
+        varianza_explicada -> np.uint8: por default 0.95, pero se puede recibir la cantidad deseada entre 0 y 1.
+
+    Retorno
+    --------
+        X_df_numerico_scaled_svd -> pd.DataFrame: retorna el dataset reducido.
+    """
+    scaled = MinMaxScaler().fit_transform(df)
+    X_df_numerico_scaled = pd.DataFrame(scaled)
+    print("Aplicando MinMaxScaler previo al TruncatedSVD...")
+    svd = TruncatedSVD(n_components=X_df_numerico_scaled.shape[1]-1, n_iter=10, random_state=10)
+    svd.fit(X_df_numerico_scaled)
+
+    var_cumu = np.cumsum(svd.explained_variance_ratio_) 
+    k = np.argmax(var_cumu > varianza_explicada )
+        
+    svd = TruncatedSVD(n_components=k +1 , n_iter=10, random_state=10)
+    X_df_numerico_scaled_svd = pd.DataFrame(svd.fit_transform(X_df_numerico_scaled))
+    print('TruncatedSVD aplicado con',  k+1, 'componentes finales se explica una varianza de: %.10f' % svd.explained_variance_ratio_.sum())
+    return X_df_numerico_scaled_svd
+
+
+def reduccion_rfecv(estimator, X_df, y_df, min_features_to_select, step, n_jobs, scoring, cv):
+    selector = RFECV(
+                    estimator=estimator,
+                    min_features_to_select=min_features_to_select,
+                    step=step,
+                    n_jobs=n_jobs,
+                    scoring=scoring,
+                    cv=cv,
+                    )
+    selector = selector.fit(X_df, y_df)
+
+    f = selector.get_support(1) 
+    X_reduced = X_df[X_df.columns[f]] 
+    return X_reduced
+
+def obtener_features_continuas(df: pd.DataFrame):
+    return df[['edad', 'suma_declarada_bolsa_argentina']]
+
+def get_dataframe_scaled(df, scaler_r):
+    scaled = scaler_r.fit_transform(df)
+    return pd.DataFrame(scaled, index = df.index, columns = df.columns)
+
+def obtener_features_discretas(df: pd.DataFrame):
+    df_d = df[[
+        'edad',
+        'anios_estudiados',
+        'categoria_de_trabajo',
+        'educacion_alcanzada', 
+        'estado_marital', 
+        'genero','religion', 
+        'rol_familiar_registrado', 
+        'suma_declarada_bolsa_argentina',
+        'horas_trabajo_registradas',
+        'trabajo']].copy()
+    df_d['edad'] = KBinsDiscretizer(n_bins=10, encode='ordinal',strategy = "kmeans").fit_transform(df_d.loc[:,['edad']])
+    df_d['suma_declarada_bolsa_argentina'] = KBinsDiscretizer(n_bins=8, encode='ordinal',strategy = "kmeans").fit_transform(df_d.loc[:,['suma_declarada_bolsa_argentina']])
+    df_d['horas_trabajo_registradas'] = KBinsDiscretizer(n_bins=6, encode='ordinal',strategy = "kmeans").fit_transform(df_d.loc[:,['horas_trabajo_registradas']])
+
+    df_d_n = conversion_numerica(df_d)
+    return df_d_n
+
+
+#######  FUNCIONES GENERACIÓN DE FEATURES Y DEMÁS AUXILIARES
+
+
+def filter_by_variance(df, threshold):
+    cols_con_varianza = df.var().index.values
+    _df = df[cols_con_varianza].copy()
+    selector = VarianceThreshold(threshold=threshold)
+    vt = selector.fit(_df)
+    _df = _df.loc[:, vt.get_support()]
+    return _df
+
+
+def renombrar_variables(df: pd.DataFrame):
+    df.rename(columns={'ganancia_perdida_declarada_bolsa_argentina':'suma_declarada_bolsa_argentina'},inplace=True)
+    df['rol_familiar_registrado'].mask((df.rol_familiar_registrado == 'casado' ) | (df.rol_familiar_registrado == 'casada'), 'casado_a', inplace=True)
+    df['estado_marital'].mask(df.estado_marital == 'divorciado' , 'divorciado_a', inplace=True)
+    df['estado_marital'].mask(df.estado_marital == 'separado', 'separado_a', inplace=True)
+    
+def solucionar_missings(df: pd.DataFrame):
+    df['categoria_de_trabajo'].replace(np.nan,'No contesta', inplace=True)
+    df['trabajo'].replace(np.nan,'No contesta', inplace=True)
+   
+def conversion_tipos(df: pd.DataFrame):
     # Conversión tipos datos para optimización de memoria
         # "category": to more efficiently store the data -> https://pbpython.com/pandas_dtypes_cat.html#:~:text=The%20category%20data%20type%20in,more%20efficiently%20store%20the%20data.
-    X_train = X_train.astype({
+    df = df.astype({
             "trabajo": "category", 
             "categoria_de_trabajo": "category",
             "genero": "category",
-            "barrio": "category",
             "religion": "category",
             "educacion_alcanzada": "category",
             "estado_marital": "category",
@@ -199,22 +325,18 @@ def aplicar_preparacion_tp2(df_train: pd.DataFrame):
             }) 
 
         # ubyte: [0, 255) -> https://numpy.org/devdocs/reference/arrays.scalars.html#numpy.ubyte 
-    X_train = X_train.astype({
+    df = df.astype({
             "tiene_alto_valor_adquisitivo": np.ubyte, 
             "edad": np.ubyte,
             "anios_estudiados": np.ubyte,
             "horas_trabajo_registradas": np.ubyte,
             }) 
 
+def obtener_feature_validacion(df: pd.DataFrame):
+    y_target = np.array(df[['tiene_alto_valor_adquisitivo']]).ravel()
+    df.drop(columns=['tiene_alto_valor_adquisitivo'], inplace=True)
+    return y_target
 
-    # Obtención de feature de validación: 
-    y_target = np.array(X_train[['tiene_alto_valor_adquisitivo']]).ravel()
-    X_train.drop(columns=['tiene_alto_valor_adquisitivo'], inplace=True)
-
-    return X_train, y_target
-
-
-####### Se generaron nuevas features en ciertos analisis del TP1. En este preprocessing.py están dichas funciones que generan esas nuevas features.
 
 
 def generalizar_empleados_publicos(categoria):
@@ -254,38 +376,6 @@ def agrupar_educacion_alcanzada(categoria):
         return 'Jardin'    
     return categoria
 
-
-def agrupar_educacion_alcanzada_tp2(categoria):
-    """
-        Nueva generación
-        
-    """
-        
-    if categoria in ['universidad_4_anio','universiada_5_anio','universiada_6_anio']:
-        return 'universitario_avanzado'
-    if categoria in ['universidad_1_anio','universidad_2_anio','universidad_3_anio']:
-        return 'universitario_inicial'
-    if categoria in ['1_anio','2_anio','3_anio']:
-        return 'segundo_ciclo'
-    if categoria in ['4_anio','5_anio','6_anio']:
-        return 'segundo_ciclo'
-    if categoria in ['1-4_grado','5-6_grado']:
-        return 'ciclo_inicial'
-    if categoria in ['7-8_grado','9_grado']:
-        return 'ciclo_inicial'
-    if categoria in ['preescolar']:
-        return 'ciclo_inicial'    
-    return categoria
-
-
-def agrupar_cristiano_o_no_tp2(categoria):
-    """
-        Nueva generación
-        
-    """
-    if categoria not in ['cristianismo']:
-        return 'no_cristianismo'
-    return categoria
 
 def agrupar_palermo_o_no_tp2(categoria):
     """
@@ -330,7 +420,7 @@ def agrupar_edad_por_rangos(df: pd.DataFrame):
     pd.Series(pd.cut(df['edad'], bins = rango_edades))
  
 
-################## FUNCIONES AUXILIARES USADAS
+# MAS FUNCIONES AUXILIARES USADAS
 
 def graficar_matriz_confusion(y_true, y_pred):
     """
