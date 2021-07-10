@@ -10,6 +10,7 @@ from sklearn.feature_selection import VarianceThreshold
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.decomposition import TruncatedSVD
 from sklearn.feature_selection import RFECV
+from sklearn.preprocessing import KBinsDiscretizer
 
 def obtener_datasets():
     """Se obtiene los datasets descargados desde Google Drive de la materia.
@@ -477,31 +478,3 @@ def plot_roc_curves(clf, XX_test, yy_test, XX_train, yy_train):
     plt.title('Curva ROC', weight= "bold")
     plt.legend(loc="lower right")
     plt.show()
-    
-def plot_roc_curves_red(clf, XX_test, yy_test, XX_train, yy_train):
-    plt.figure(dpi=110)
-
-    # For Test
-    fpr_test, tpr_test, _ = roc_curve(yy_test, clf.predict(XX_test))
-    roc_auc_test = auc(fpr_test, tpr_test)
-    # For Train
-    fpr_train, tpr_train, _  = roc_curve(yy_train, clf.predict(XX_train))
-    roc_auc_train = auc(fpr_train, tpr_train)
-
-    # Ploting
-    plt.plot(
-        fpr_test, tpr_test, color='red', lw=1, label=f'ROC curve for Test (area = {roc_auc_test:.2f})'
-    )
-    plt.plot(
-        fpr_train, tpr_train, color='green', lw=1, label=f'ROC curve for Train (area = {roc_auc_train:.2f})'
-    )
-
-    plt.plot([0, 1], [0, 1], color='navy', lw=1, linestyle='--')
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate', weight= "bold")
-    plt.ylabel('True Positive Rate', weight= "bold")
-    plt.title('Curva ROC', weight= "bold")
-    plt.legend(loc="lower right")
-    plt.show()
-
