@@ -33,6 +33,39 @@ def obtener_datasets():
     
     return df_train, df_holdout
 
+
+def aplicar_preparacion_holdout(df_for_prediction: pd.DataFrame, generalizada: bool):
+    """
+    Prepara el dataset para predecir. Elimina aquellas features que durante el entrenamiento no se tuvieron en cuenta, es decir la 'id' y 'representatividad_poblacional'.
+    Además se le aplica la función de 'aplicar_preparacion()' o 'aplicar_preparacion_generalizado()' según el booleano recibido.
+    
+    Parametros recibidos
+    --------
+        df -> pd.DataFrame: El dataset obtenido mediante 'obtener_datasets()'
+        generalizada -> bool: Un booleano que indica si se desea aplicar la preparacion generalizada o no.
+
+    Retorno
+    --------
+        X_df -> pd.DataFrame: El dataset listo para predecir, solamente con los features sin la target.
+    """
+    #por las dudas ordenamos las columnas según el id recibido
+    df_new = df_for_prediction.sort_values('id')
+    
+    # borramos las columnas que no se usaran para la predicción
+    df_new = df_new.drop(columns=['id', 'representatividad_poblacional'])
+    
+    # agrego una columna de si tiene alto valor adquisitivo totalmente random para aplicar la función de preparacion que ya teniamos, no nos interesará esta variable al aplicar la preparación.
+    df_new['tiene_alto_valor_adquisitivo'] = np.random.randint(0, 2, df_new.shape[0])
+    
+    #por las dudas ordenamos las columnas según el id recibido
+    if not generalizada: 
+        X_df, _ = aplicar_preparacion(df_new)
+    else:
+        X_df, _ = aplicar_preparacion_generalizado(df_new)
+
+    return X_df
+
+
 def aplicar_preparacion(df: pd.DataFrame):
     """Se prepara el dataset para entrenar acorde al Análisis Exploratorio realizado en el TP1.
 
