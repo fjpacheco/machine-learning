@@ -11,6 +11,7 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.decomposition import TruncatedSVD
 from sklearn.feature_selection import RFECV
 from sklearn.preprocessing import KBinsDiscretizer
+from sklearn.model_selection import StratifiedKFold
 
 def obtener_datasets():
     """Se obtiene los datasets descargados desde Google Drive de la materia.
@@ -127,7 +128,7 @@ def aplicar_preparacion_generalizado(df: pd.DataFrame):
 
 def conversion_numerica(X_train: pd.DataFrame):
     """ 
-    A las features con noción de orden se les asigna numero según el orden dado (por ejemplo, la feature de educacion_alcanzada) con OrdinalEncoder.
+    A las features categóricas con noción de orden se les asigna numero según el orden dado (por ejemplo, la feature de educacion_alcanzada) con OrdinalEncoder.
     Y a las features sin orden se le aplica OneHotEncoding.
     
     Parametros recibidos
@@ -281,29 +282,115 @@ def reduccion_numerica(df: pd.DataFrame, varianza_explicada: np.uint8 = 0.95):
     return X_df_numerico_scaled_svd
 
 
-def reduccion_rfecv(estimator, X_df, y_df, min_features_to_select, step, n_jobs, scoring, cv):
+def reduccion_rfecv(clf, X_df, Y_df, min_features_to_select=1, n_jobs=-1, scoring='roc_auc', cv=5):
+    """
+    Es una técnica de selección de tipo embedded, encargándose de rankear variables según métodos internos de cada algoritmo.
+    
+    La idea principal de RFECV es igual a la del RFE. Es decir:
+
+    1. Entrenar un modelo con un clasificador recibido ('clf')
+    2. Obtener importancias a partir de un modelo.  
+    3. Eliminar la/las variables menos importantes
+    4. Repetir 
+
+    Esto se repite hasta que converga y mi modelo deje de mejorar. Un hiperparámetro importante de la implementación RFE 
+    en sklearn es la **cantidad de features a seleccionar** pero ese numero no suele conocerse.
+
+    Para buscar el numero de optimo de features a seleccionar, el método de RFECV utiliza cross-validation (por eso el acrónimo RFECV: RFE-CV).
+    Es decir, realiza la validación (sobre el conjunto validación 'Y_df' recibido aplicándole el clasificador 'clf') con cross-validation usando
+    diferentes números de features en distintos folds, y seleccionando el mejor numero de features que mejor score ('score'='roc_auc' por default) nos de.
+    
+    Internamente se utiliza cross-validation de forma estratificada (StratifiedKFold) para mantener la proporción de clases (de 'Y_df') en cada fold.
+
+    Parametros recibidos
+    --------
+        * clf -> El clasificador que se utilizará para obtener las importancias de features y que se usará para validar diferentes scores con cross-validation.
+        * X_df -> El dataset a cual reducir la features, sin la feature de validación.
+        * Y_df -> La feature de validación utilizada para encontrar el número optimo de features según el scoring del clasificador recibido.
+        * min_features_to_select -> Mínimo de features a seleccionar, por default es 1.
+        * n_jobs -> Número de núcleos para correr en paralelo mientras se entrena cada fold de cross-validation, por default es -1 (todos los núcleos).
+        * scoring -> Un string indicando el tipo de métrica a utilizar para calcular el score vía cross-validation, por default es 'roc_auc'.
+        * cv -> Número que indica la cantidad de divisiones realizadas por cross-validation.
+    
+    Retorno
+    --------
+        * X_reduced -> pd.DataFrame: retorna el dataset reducido con RFECV.
+    """
+    cv_stratified = StratifiedKFold(n_splits=cv, random_state=10, shuffle=True)
+
     selector = RFECV(
-                    estimator=estimator,
+                    estimator=clf,
                     min_features_to_select=min_features_to_select,
-                    step=step,
                     n_jobs=n_jobs,
                     scoring=scoring,
-                    cv=cv,
+                    cv=cv_stratified,
                     )
-    selector = selector.fit(X_df, y_df)
+    selector = selector.fit(X_df, Y_df)
 
     f = selector.get_support(1) 
     X_reduced = X_df[X_df.columns[f]] 
     return X_reduced
 
 def obtener_features_continuas(df: pd.DataFrame):
-    return df[['edad', 'suma_declarada_bolsa_argentina']]
+    """
+    Retorna un dataset con las features continuas a considerar:
+        * edad
+        * suma_declarada_bolsa_argentina
+        * anios_estudiados
+        * horas_trabajo_registradas
+
+    Parametros recibidos
+    --------
+        * df -> pd.DataFrame: el dataset para seleccionar las variables continuas.
+    Retorno
+    --------
+        * df -> pd.DataFrame: retorna el dataset con las variables continuas.
+    """
+    return df[['edad', 'suma_declarada_bolsa_argentina', 'anios_estudiados', 'horas_trabajo_registradas']]
 
 def get_dataframe_scaled(df, scaler_r):
+    """
+    Aplica un escalado recibido por parametro (scaler_r) sobre el dataset 'df' recibido y retorna un nuevo dataset con el escalado aplicado.
+
+    Parametros recibidos
+    --------
+        * df -> pd.DataFrame: el dataset para aplicar el escalado de datos.
+        * scaler_r -> El escalado para aplicar sobre el dataset.
+    Retorno
+    --------
+        * df -> pd.DataFrame: retorna el nuevo dataset con el escalado aplicado.
+    """    
     scaled = scaler_r.fit_transform(df)
     return pd.DataFrame(scaled, index = df.index, columns = df.columns)
 
 def obtener_features_discretas(df: pd.DataFrame):
+    """
+    Retorna un dataset con las features a discretas a considerar.
+
+    Las siguientes variables categóricas seran convertidas con el método 'conversion_numerica()':
+        * categoria_de_trabajo
+        * educacion_alcanzada
+        * estado_marital
+        * genero
+        * religion
+        * rol_familiar_registrado
+        * trabajo
+
+    Las siguientes features se las discretiza con 'KBinsDiscretizer':
+        * horas_trabajo_registradas
+        * suma_declarada_bolsa_argentina
+        * edad
+
+    Y también se considerará como feature discreta sin cambios a realizarles:
+        * anios_estudiados
+
+    Parametros recibidos
+    --------
+        * df -> pd.DataFrame: el dataset para seleccionar las variables discretas.
+    Retorno
+    --------
+        * df -> pd.DataFrame: retorna el dataset con las nuevas variables discretas.
+    """
     df_d = df[[
         'edad',
         'anios_estudiados',
